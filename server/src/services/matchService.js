@@ -1,65 +1,61 @@
-// server/src/services/matchService.js
-const store = require('../data/store');
+let matches = [];
+let idCounter = 1;
 
 function createMatch(teamA, teamB) {
   const match = {
-    id: store.nextId++,
+    id: idCounter++,
     teamA,
     teamB,
     scoreA: 0,
     scoreB: 0,
-    status: 'pending', // pending | ongoing
+    status: "not_started",
     events: []
   };
-  store.matches.push(match);
+  matches.push(match);
   return match;
 }
 
 function startMatch(id) {
-  const m = store.matches.find(x => x.id === id);
-  if (!m) return null;
-  m.status = 'ongoing';
-  return m;
-}
+  const match = matches.find(m => m.id === id);
+  if (!match) return null;
 
-function getOngoingMatches() {
-  return store.matches.filter(m => m.status === 'ongoing');
-}
-
-function getMatchById(id) {
-  return store.matches.find(m => m.id === id) || null;
+  match.status = "live";
+  return match;
 }
 
 function addEvent(id, eventType, side, details) {
-  const match = getMatchById(id);
+  const match = matches.find(m => m.id === id);
   if (!match) return null;
 
   const event = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
     type: eventType,
-    side: side || null, // 'A' or 'B'
-    details: details || '',
-    time: new Date().toISOString()
+    side,
+    details,
+    minute: details?.minute || Math.floor(Math.random() * 90) + 1,
+    timestamp: new Date().toISOString()
   };
 
-  if (eventType === 'goal') {
-    if (event.side === 'A') match.scoreA += 1;
-    else if (event.side === 'B') match.scoreB += 1;
-    else {
-      // default to A if missing
-      match.scoreA += 1;
-      event.side = 'A';
-    }
-  }
+  match.events.push(event);
 
-  match.events.unshift(event); // latest first
+  // scoring logic
+  if (eventType === "goalA") match.scoreA++;
+  if (eventType === "goalB") match.scoreB++;
+
   return { match, event };
+}
+
+function getMatchById(id) {
+  return matches.find(m => m.id === id) || null;
+}
+
+function getOngoingMatches() {
+  return matches.filter(m => m.status === "live");
 }
 
 module.exports = {
   createMatch,
   startMatch,
-  getOngoingMatches,
+  addEvent,
   getMatchById,
-  addEvent
+  getOngoingMatches
 };

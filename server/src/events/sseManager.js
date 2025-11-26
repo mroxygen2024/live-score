@@ -1,8 +1,5 @@
-// server/src/events/sseManager.js
-// Manages SSE clients for live scores and per-match updates.
-
-const matchClients = {}; // matchId -> [res,...]
-const liveClients = []; // all clients wanting global live-scores
+const liveClients = [];
+const matchClients = new Map();
 
 function sendSse(res, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -13,33 +10,28 @@ function addLiveClient(res) {
 }
 
 function removeLiveClient(res) {
-  const i = liveClients.indexOf(res);
-  if (i >= 0) liveClients.splice(i, 1);
+  const idx = liveClients.indexOf(res);
+  if (idx !== -1) liveClients.splice(idx, 1);
 }
 
 function addMatchClient(matchId, res) {
-  if (!matchClients[matchId]) matchClients[matchId] = [];
-  matchClients[matchId].push(res);
+  if (!matchClients.has(matchId)) matchClients.set(matchId, []);
+  matchClients.get(matchId).push(res);
 }
 
 function removeMatchClient(matchId, res) {
-  const arr = matchClients[matchId];
+  const arr = matchClients.get(matchId);
   if (!arr) return;
-  const i = arr.indexOf(res);
-  if (i >= 0) arr.splice(i, 1);
-  if (arr.length === 0) delete matchClients[matchId];
+  matchClients.set(matchId, arr.filter(r => r !== res));
 }
 
-function broadcastLiveScores(matches) {
-  const payload = { type: 'live-scores', matches };
-  liveClients.forEach(res => sendSse(res, payload));
+function broadcastLiveScores(payload) {
+  liveClients.forEach(c => sendSse(c, { type: "live-scores", matches: payload }));
 }
 
 function broadcastMatchEvent(matchId, payload) {
-  // payload example: { event, matchSnapshot }
-  const clients = matchClients[matchId] || [];
-  const data = { type: 'match-event', ...payload };
-  clients.forEach(res => sendSse(res, data));
+  const clients = matchClients.get(matchId) || [];
+  clients.forEach(c => sendSse(c, { type: "match-update", ...payload }));
 }
 
 module.exports = {
